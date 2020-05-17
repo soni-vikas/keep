@@ -1,0 +1,129 @@
+#!/bin/bash
+
+function help() {
+  echo "Example usage: "
+  echo "  keep [-s| --source] source [-d| --destination] [-t| --suffix] [--no-suffix] [-h]"
+  echo ""
+  echo "Description: "
+  echo "      -s, --source              Name of the source file or directory."
+  echo "      -d, --destination       Default destination directory: '$HOME' - home directory."
+  echo "      -t, --suffix            provided suffix will get appended in source file/dir name."
+  echo "                              A copy of same will be save to destination."
+  echo "                              Example:"
+  echo "                                  keep file.txt -t vikas"
+  echo "                                  ->  keeping backup at:  HOME-DIR/.keep/file.txt_abc"
+  echo "      --no-suffix             keep the file-name as source file-same. Ignore [-t| --suffix]"
+  echo "      -h, --help              print help usage"
+  exit
+}
+
+function check_error() {
+  if [ "$2" = "" ] || [ ${2:0:1} = "-" ]; then
+    echo "Missing argument for: $1"
+    exit
+  fi
+}
+
+function init() {
+  destination="__default__"
+  suffix="__default__"
+  file="__default__"
+  no_suffix="__default__"
+}
+
+function raise_error() {
+  echo "$@"
+  exit
+}
+
+function exec_command() {
+  $1
+  x=$?
+  if [ $x -eq 0 ]; then
+    if [ "$2" != "" ]; then
+      echo ""
+      echo $2 # success message
+    fi
+  else
+    exit 1
+  fi
+}
+
+# parse arguments
+init
+while [[ $# -gt 0 ]]; do
+  key="$1"
+  case $key in
+  -d | --destination)
+    check_error $1 $2
+    destination=$2
+    shift 2
+    ;;
+  -s | --source)
+    check_error $1 $2
+    file=$2
+    shift 2
+    ;;
+  -t | --suffix)
+    check_error $1 $2
+    suffix=$2
+    shift 2
+    ;;
+  --no-suffix)
+    no_suffix="true"
+    shift
+    ;;
+  -h | --help)
+    help
+    ;;
+  -* | --*) # unsupported flags
+    raise_error "Unsupported flag: $1"
+    ;;
+  *) # unknown option
+    if [ $file = "__default__" ]; then
+      file="$1"
+      shift
+    else
+      raise_error "Unknown format: $1"
+    fi
+    ;;
+  esac
+done
+
+# check for source
+if [ $file = "__default__" ]; then
+  raise_error "Missing source: option[-s| --source]"
+fi
+
+# check for suffix
+if [ $no_suffix = "__default__" ]; then
+  if [ $suffix = "__default__" ]; then
+    suffix=$(date)
+    suffix=$(echo "${suffix//[ :]/_}" | tr "[:upper:]" "[:lower:]")
+  fi
+  suffix="_$suffix"
+else
+  suffix=""
+fi
+
+# check for destination
+if [ $destination = "__default__" ]; then
+  destination="${HOME}/.keep"
+fi
+
+exec_command "mkdir -p ${destination}"
+
+_temp=$(basename $file)
+destination="${destination}/${_temp}${suffix}"
+
+exec_command "cp -rf $file $destination" "... keeping backup at: ${destination//\/\//\/}"
+
+# keep file.txt
+# keep -s file.txt
+# keep --source file.txt
+# keep -s file.txt -d ~/.keep
+# keep main.py -d ../nlu2
+# keep -s main.py -d ../nlu2
+# keep --source main.py -d ../nlu2
+# keep -s main.py -d ../nlu2
+# keep -s abc
